@@ -13,7 +13,11 @@ def read_ph():
     return ph, voltage
 
 def read_tds():
-    voltage = tdsADC.value * VREF
+    readings = []
+    end_time = time.time() + 0.020  # 20ms = one 50Hz AC cycle
+    while time.time() < end_time:
+        readings.append(tdsADC.value)
+    voltage = (sum(readings) / len(readings)) * VREF
     ppm = voltage * TDS_FACTOR
     return ppm, voltage
 
@@ -22,7 +26,7 @@ try:
     while True:
         ph, ph_volt = read_ph()
         tds, tds_volt = read_tds()
-        print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm")
+        print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | TDS voltage: {tds_volt:.4f} | pH voltage: {ph_volt:.4f}")
         time.sleep(1)
 
 except KeyboardInterrupt:

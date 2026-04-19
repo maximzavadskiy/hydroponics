@@ -1,5 +1,6 @@
 from gpiozero import MCP3008
 import time
+import statistics
 
 phADC = MCP3008(channel=0)
 tdsADC = MCP3008(channel=2)
@@ -12,12 +13,10 @@ def read_ph():
     ph = (3.66 - voltage) / 0.168
     return ph, voltage
 
-def read_tds():
-    readings = []
-    end_time = time.time() + 0.020  # 20ms = one 50Hz AC cycle
-    while time.time() < end_time:
-        readings.append(tdsADC.value)
-    voltage = (sum(readings) / len(readings)) * VREF
+def read_tds(samples=30):
+    readings = [tdsADC.value for _ in range(samples)]
+    median_value = statistics.median(readings)
+    voltage = median_value * VREF
     ppm = voltage * TDS_FACTOR
     return ppm, voltage
 

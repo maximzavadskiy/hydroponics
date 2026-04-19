@@ -15,10 +15,11 @@ def read_ph():
 
 def read_tds():
     readings = []
-    end_time = time.time() + 0.020  # 20ms = one 50Hz AC cycle
+    end_time = time.time() + 2  # 20ms = one 50Hz AC cycle
     while time.time() < end_time:
         readings.append(tdsADC.value)
-    median_value = statistics.median(readings)
+        time.sleep(0.001)
+    median_value = statistics.mean(readings)
     voltage = median_value * VREF
     ppm = voltage * TDS_FACTOR
     return ppm, voltage

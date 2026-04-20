@@ -3,8 +3,8 @@ from gpiozero.mixins import GPIOQueue
 import statistics
 import time
 
-phADC = MCP3008(channel=0)
-tdsADC = MCP3008(channel=2)
+phADC = MCP3008(channel=0 )
+tdsADC = MCP3008(channel=1)
 
 VREF = 5.0
 temperature = 25

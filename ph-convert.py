@@ -9,13 +9,13 @@ tdsADC = MCP3008(channel=2)
 VREF = 5.0
 temperature = 25
 
-tds_queue = GPIOQueue(tdsADC, queue_len=30, sample_wait=0.04, partial=False, average=statistics.median)
+tds_queue = GPIOQueue(tdsADC, queue_len=30, sample_wait=0.04, partial=True, average=statistics.mean)
 tds_queue.start()
 
 def read_ph():
     voltage = phADC.value * VREF
     ph = (3.66 - voltage) / 0.168
-    return ph, voltage
+    return ph
 
 def read_tds():
     median_raw = tds_queue.value
@@ -28,9 +28,9 @@ def read_tds():
 print("--- pH & TDS Live Readings ---")
 try:
     while True:
-        ph, ph_volt = read_ph()
+        ph = read_ph()
         tds, tds_volt = read_tds()
-        print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | TDS voltage: {tds_volt:.4f} | pH voltage: {ph_volt:.4f}")
+        print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | TDS voltage: {tds_volt:.4f}V")
         time.sleep(1)
 
 except KeyboardInterrupt:

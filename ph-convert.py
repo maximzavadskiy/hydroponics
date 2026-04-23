@@ -2,6 +2,13 @@ from gpiozero import MCP3008
 from gpiozero.mixins import GPIOQueue
 import statistics
 import time
+import subprocess
+from datetime import datetime
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+from server import app, db, SensorData, Snapshot
+from flow_sensor import get_flowrate, flow_sensor
 
 phADC = MCP3008(channel=0 )
 tdsADC = MCP3008(channel=1)
@@ -11,6 +18,11 @@ temperature = 25
 
 tds_queue = GPIOQueue(tdsADC, queue_len=30, sample_wait=0.04, partial=True, average=statistics.mean)
 tds_queue.start()
+
+snapshot_dir = Path(__file__).parent / "snapshots"
+snapshot_dir.mkdir(exist_ok=True)
+last_snapshot_time = 0
+last_db_log_time = 0
 
 def read_ph():
     voltage = phADC.value * VREF
@@ -25,13 +37,41 @@ def read_tds():
     tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5
     return tds_value, voltage
 
+def take_snapshot():
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filepath = snapshot_dir / f"snapshot_{timestamp}.jpg"
+    subprocess.run(["rpicam-still", "-o", str(filepath), "-t", "1000"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    return filepath
+
 print("--- pH & TDS Live Readings ---")
 try:
-    while True:
-        ph = read_ph()
-        tds, tds_volt = read_tds()
-        print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | TDS voltage: {tds_volt:.4f}V")
-        time.sleep(1)
+    with app.app_context():
+        while True:
+            ph = read_ph()
+            tds, tds_volt = read_tds()
+            flow_rate, avg_flow, total_liters = get_flowrate()
+            print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | Flow: {flow_rate:.2f}L/min (avg: {avg_flow:.2f}L/min) | Total: {total_liters:.3f}L")
+
+            current_time = time.time()
+
+            # Log to database every 10 seconds
+            if current_time - last_db_log_time >= 10:
+                sensor_entry = SensorData(ph=ph, tds=tds, tds_voltage=tds_volt)
+                db.session.add(sensor_entry)
+                db.session.commit()
+                last_db_log_time = current_time
+
+            # Take snapshot every 60 seconds
+            if current_time - last_snapshot_time >= 60:
+                filepath = take_snapshot()
+                snapshot = Snapshot(filename=filepath.name)
+                db.session.add(snapshot)
+                db.session.commit()
+                print(f"Snapshot saved: {filepath}")
+                last_snapshot_time = current_time
+
+            time.sleep(1)
 
 except KeyboardInterrupt:
     tds_queue.stop()

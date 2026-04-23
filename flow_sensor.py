@@ -26,7 +26,7 @@ def get_flowrate():
     current_count = pulse_count
     pulse_count = 0
 
-    flow_rate = current_count * 0.00225   # L/min
+    flow_rate = current_count / 7.5  # L/min
     total_liters = ((total_pulses / 450) * 2) * CALIBRATION
 
     # Track flow for averaging (keep last 60 readings = ~1 minute)

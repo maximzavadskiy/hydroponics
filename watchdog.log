@@ -128,3 +128,9 @@
 [2026-04-26 15:35:01] ph-convert.py is running
 [2026-04-26 15:36:01] ph-convert.py is running
 [2026-04-26 15:37:02] ph-convert.py is running
+[2026-04-26 15:38:01] ph-convert.py is running
+[2026-04-26 15:39:01] ph-convert.py not running - restarting via systemd
+[2026-04-26 15:39:01] hydroponics.service restarted successfully
+[2026-04-26 15:39:01] All services healthy
+[2026-04-26 15:40:01] All services healthy
+[2026-04-26 15:41:01] All services healthy

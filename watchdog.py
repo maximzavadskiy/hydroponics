@@ -2,12 +2,12 @@
 import subprocess
 import psutil
 import time
+import requests
 from pathlib import Path
 
-script_path = Path(__file__).parent / "ph-convert.py"
 log_file = Path(__file__).parent / "watchdog.log"
 
-def is_running(process_name="ph-convert.py"):
+def is_running(process_name):
     """Check if the process is running"""
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
@@ -18,13 +18,21 @@ def is_running(process_name="ph-convert.py"):
             pass
     return False
 
-def restart_app():
-    """Restart the application"""
+def restart_service(service_name):
+    """Restart a systemd service"""
     try:
-        subprocess.Popen(['python3', str(script_path)])
-        log_message(f"App restarted successfully")
+        subprocess.run(['sudo', 'systemctl', 'restart', service_name], check=True)
+        log_message(f"{service_name} restarted successfully")
     except Exception as e:
-        log_message(f"Error restarting app: {e}")
+        log_message(f"Error restarting {service_name}: {e}")
+
+def check_server_health():
+    """Check if server is responding"""
+    try:
+        response = requests.get('http://localhost:5000/api/app-status', timeout=2)
+        return response.status_code == 200
+    except:
+        return False
 
 def log_message(msg):
     """Log message to file"""
@@ -33,8 +41,14 @@ def log_message(msg):
         f.write(f"[{timestamp}] {msg}\n")
 
 if __name__ == '__main__':
-    if not is_running():
-        log_message("ph-convert.py not running - restarting")
-        restart_app()
+    # Check sensor app
+    if not is_running("ph-convert.py"):
+        log_message("ph-convert.py not running - restarting via systemd")
+        restart_service("hydroponics.service")
+
+    # Check server health
+    if not check_server_health():
+        log_message("Server not responding - restarting via systemd")
+        restart_service("hydroponics-server.service")
     else:
-        log_message("ph-convert.py is running")
+        log_message("All services healthy")

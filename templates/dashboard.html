@@ -26,11 +26,22 @@
         .snapshot-info { color: #666; font-size: 12px; margin-top: 10px; }
         .current-value { font-size: 28px; font-weight: bold; color: #007bff; margin: 10px 0; }
         .value-unit { color: #666; font-size: 14px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-dot.alive { background: #00FF00; box-shadow: 0 0 10px #00FF00; }
+        .status-dot.dead { background: #FF0000; }
+        .status-info { font-size: 14px; color: #666; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🌱 Hydroponics Dashboard</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1>🌱 Hydroponics Dashboard</h1>
+            <div style="text-align: right;">
+                <div><span class="status-dot alive" id="status-dot"></span><span id="app-status">ALIVE</span></div>
+                <div class="status-info" id="app-uptime">Uptime: --</div>
+                <div class="status-info" id="app-last-update">Last update: --</div>
+            </div>
+        </div>
 
         <div class="time-filter">
             <button class="time-btn active" data-hours="1">1H</button>
@@ -54,6 +65,11 @@
                 <h2>Motor Speed</h2>
                 <div class="current-value" id="motor-value">--</div>
                 <p style="color: #666; font-size: 14px; margin-top: 20px;">1.0 = Full Power | 0.25 = Reduced Power</p>
+            </div>
+            <div class="card">
+                <h2>Lights</h2>
+                <div class="current-value" id="light-value" style="color: #FFC107;">OFF</div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">Schedule: 9am - 1am (16h)</p>
             </div>
         </div>
 
@@ -80,7 +96,43 @@
                 document.getElementById('ph-value').textContent = latest.ph.toFixed(2);
                 document.getElementById('tds-value').textContent = Math.round(latest.tds);
                 document.getElementById('motor-value').textContent = latest.motor_speed.toFixed(2);
+                const lightStatus = latest.light_on ? 'ON' : 'OFF';
+                document.getElementById('light-value').textContent = lightStatus;
+                document.getElementById('light-value').style.color = latest.light_on ? '#00FF00' : '#FFC107';
             }
+        }
+
+        async function loadAppStatus() {
+            const response = await fetch('/api/app-status');
+            const status = await response.json();
+
+            const dot = document.getElementById('status-dot');
+            const statusText = document.getElementById('app-status');
+
+            if (status.alive) {
+                dot.classList.remove('dead');
+                dot.classList.add('alive');
+                statusText.textContent = 'ALIVE';
+                statusText.style.color = '#00FF00';
+            } else {
+                dot.classList.remove('alive');
+                dot.classList.add('dead');
+                statusText.textContent = 'DEAD';
+                statusText.style.color = '#FF0000';
+            }
+
+            document.getElementById('app-uptime').textContent = `Uptime: ${status.uptime}`;
+
+            // Format time since update
+            let timeStr;
+            if (status.time_since_update < 60) {
+                timeStr = `${status.time_since_update}sec ago`;
+            } else if (status.time_since_update < 3600) {
+                timeStr = `${Math.floor(status.time_since_update / 60)}min ago`;
+            } else {
+                timeStr = `${Math.floor(status.time_since_update / 3600)}h ago`;
+            }
+            document.getElementById('app-last-update').textContent = `Last update: ${timeStr}`;
         }
 
         async function loadPlots(hours) {
@@ -139,9 +191,11 @@
         // Initial load
         loadPlots(currentHours);
         loadSnapshots();
+        loadAppStatus();
 
-        // Refresh every 10 seconds for values, 30s for plots
-        setInterval(loadSensorData, 10000);
+        // Refresh intervals
+        setInterval(loadSensorData, 10000);  // Update sensor values every 10s
+        setInterval(loadAppStatus, 2000);    // Check app status every 2s
         setInterval(() => {
             loadPlots(currentHours);
             loadSnapshots();

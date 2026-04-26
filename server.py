@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 from pathlib import Path
 import os
+from datetime import timedelta
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hydroponics.db'
@@ -17,6 +18,7 @@ class SensorData(db.Model):
     tds = db.Column(db.Float)
     tds_voltage = db.Column(db.Float)
     motor_speed = db.Column(db.Float, default=1.0)
+    light_on = db.Column(db.Boolean, default=False)
 
 class Snapshot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,7 +44,8 @@ def get_sensor_data():
         'ph': d.ph,
         'tds': d.tds,
         'tds_voltage': d.tds_voltage,
-        'motor_speed': d.motor_speed
+        'motor_speed': d.motor_speed,
+        'light_on': d.light_on
     } for d in data])
 
 @app.route('/api/plot-ph')
@@ -89,6 +92,47 @@ def get_snapshots():
 def serve_snapshot(filename):
     snapshot_dir = Path(__file__).parent / "snapshots"
     return send_file(snapshot_dir / filename)
+
+app_start_time = datetime.utcnow()
+
+@app.route('/api/app-status')
+def app_status():
+    latest = SensorData.query.order_by(SensorData.timestamp.desc()).first()
+
+    if latest:
+        time_since_update = (datetime.utcnow() - latest.timestamp).total_seconds()
+        is_alive = time_since_update < 5
+    else:
+        time_since_update = float('inf')
+        is_alive = False
+
+    uptime = datetime.utcnow() - app_start_time
+    uptime_str = format_uptime(uptime)
+
+    return jsonify({
+        'alive': is_alive,
+        'time_since_update': int(time_since_update),
+        'last_update': latest.timestamp.isoformat() if latest else None,
+        'uptime': uptime_str,
+        'app_start_time': app_start_time.isoformat()
+    })
+
+def format_uptime(td):
+    """Format timedelta as '2d 3h 45m'"""
+    total_seconds = int(td.total_seconds())
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+
+    return ' '.join(parts) if parts else '0m'
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)

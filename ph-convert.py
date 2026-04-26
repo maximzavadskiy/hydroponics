@@ -1,4 +1,4 @@
-from gpiozero import MCP3008
+from gpiozero import MCP3008, OutputDevice
 from gpiozero.mixins import GPIOQueue
 import statistics
 import time
@@ -12,10 +12,13 @@ from flow_sensor import get_flowrate, flow_sensor
 from gpiozero import Motor
 from signal import pause
 
-# Define the motor (Forward Pin, Backward Pin)
-# Note: We aren't using ENA in this simple script 
-# (keep the jumper cap on ENA for this to work)
-motor = Motor(forward=17, backward=27)
+# Define motors (Forward Pin, Backward Pin)
+# Motor 1: Controlled speed (0.25-1.0)
+motor1 = Motor(forward=17, backward=27)
+# Motor 2: Full speed (GPIO 22-23)
+motor2 = Motor(forward=22, backward=23)
+# Light driver (GPIO 24)
+light_driver = OutputDevice(24)
 
 phADC = MCP3008(channel=0 )
 tdsADC = MCP3008(channel=1)
@@ -32,6 +35,11 @@ last_snapshot_time = 0
 last_db_log_time = 0
 motor_speed = 1.0  # Start at full speed
 motor_start_time = time.time()
+light_on = False
+
+# Light schedule: 9am to 1am (16 hours)
+LIGHT_ON_HOUR = 9
+LIGHT_OFF_HOUR = 1  # 1am next day
 
 def read_ph():
     voltage = phADC.value * VREF
@@ -71,11 +79,21 @@ try:
             else:
                 motor_speed = 0.7
 
-            motor.forward(speed=motor_speed)
+            motor1.forward(speed=motor_speed)
+            motor2.forward(speed=1.0)
+
+            # Light schedule: 9am to 1am (16 hours)
+            current_hour = datetime.now().hour
+            if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
+                light_driver.on()
+                light_on = True
+            else:
+                light_driver.off()
+                light_on = False
 
             # Log to database every 10 seconds
             if current_time - last_db_log_time >= 10:
-                sensor_entry = SensorData(ph=ph, tds=tds, tds_voltage=tds_volt, motor_speed=motor_speed)
+                sensor_entry = SensorData(ph=ph, tds=tds, tds_voltage=tds_volt, motor_speed=motor_speed, light_on=light_on)
                 db.session.add(sensor_entry)
                 db.session.commit()
                 last_db_log_time = current_time

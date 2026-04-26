@@ -68,7 +68,7 @@ try:
             ph = read_ph()
             tds, tds_volt = read_tds()
             flow_rate, avg_flow, total_liters = get_flowrate()
-            print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | Flow: {flow_rate:.2f}L/min (avg: {avg_flow:.2f}L/min) | Total: {total_liters:.3f}L | Motor: {motor_speed}")
+            print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | TDS voltage: {tds_volt:.4f}V | Flow: {flow_rate:.2f}L/min (avg: {avg_flow:.2f}L/min) | Total: {total_liters:.3f}L | Motor: {motor_speed}")
 
             current_time = time.time()
 

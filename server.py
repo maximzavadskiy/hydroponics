@@ -101,7 +101,7 @@ def app_status():
 
     if latest:
         time_since_update = (datetime.utcnow() - latest.timestamp).total_seconds()
-        is_alive = time_since_update < 5
+        is_alive = time_since_update < 30
     else:
         time_since_update = float('inf')
         is_alive = False

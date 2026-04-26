@@ -26,6 +26,17 @@ def restart_service(service_name):
     except Exception as e:
         log_message(f"Error restarting {service_name}: {e}")
 
+def restart_localtunnel():
+    """Restart localtunnel process"""
+    try:
+        subprocess.run(['pkill', '-f', 'localtunnel'], check=False)
+        time.sleep(1)
+        subprocess.Popen(['npx', 'localtunnel', '--port', '5000', '--subdomain', 'hydroponics-max'],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log_message("localtunnel restarted successfully")
+    except Exception as e:
+        log_message(f"Error restarting localtunnel: {e}")
+
 def check_server_health():
     """Check if server is responding"""
     try:
@@ -50,5 +61,10 @@ if __name__ == '__main__':
     if not check_server_health():
         log_message("Server not responding - restarting via systemd")
         restart_service("hydroponics-server.service")
+
+    # Check localtunnel
+    if not is_running("localtunnel"):
+        log_message("localtunnel not running - restarting")
+        restart_localtunnel()
     else:
         log_message("All services healthy")

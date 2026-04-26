@@ -16,6 +16,7 @@ class SensorData(db.Model):
     ph = db.Column(db.Float)
     tds = db.Column(db.Float)
     tds_voltage = db.Column(db.Float)
+    motor_speed = db.Column(db.Float, default=1.0)
 
 class Snapshot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -40,7 +41,8 @@ def get_sensor_data():
         'timestamp': d.timestamp.isoformat(),
         'ph': d.ph,
         'tds': d.tds,
-        'tds_voltage': d.tds_voltage
+        'tds_voltage': d.tds_voltage,
+        'motor_speed': d.motor_speed
     } for d in data])
 
 @app.route('/api/plot-ph')

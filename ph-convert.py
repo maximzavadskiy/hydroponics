@@ -9,6 +9,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from server import app, db, SensorData, Snapshot
 from flow_sensor import get_flowrate, flow_sensor
+from gpiozero import Motor
+from signal import pause
+
+# Define the motor (Forward Pin, Backward Pin)
+# Note: We aren't using ENA in this simple script 
+# (keep the jumper cap on ENA for this to work)
+motor = Motor(forward=17, backward=27)
 
 phADC = MCP3008(channel=0 )
 tdsADC = MCP3008(channel=1)
@@ -23,6 +30,8 @@ snapshot_dir = Path(__file__).parent / "snapshots"
 snapshot_dir.mkdir(exist_ok=True)
 last_snapshot_time = 0
 last_db_log_time = 0
+motor_speed = 1.0  # Start at full speed
+motor_start_time = time.time()
 
 def read_ph():
     voltage = phADC.value * VREF
@@ -51,13 +60,22 @@ try:
             ph = read_ph()
             tds, tds_volt = read_tds()
             flow_rate, avg_flow, total_liters = get_flowrate()
-            print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | Flow: {flow_rate:.2f}L/min (avg: {avg_flow:.2f}L/min) | Total: {total_liters:.3f}L")
+            print(f"pH: {ph:.2f} | TDS: {tds:.0f}ppm | Flow: {flow_rate:.2f}L/min (avg: {avg_flow:.2f}L/min) | Total: {total_liters:.3f}L | Motor: {motor_speed}")
 
             current_time = time.time()
 
+            # Motor control: full power for 60 seconds, then 0.25 power
+            elapsed = current_time - motor_start_time
+            if elapsed < 30:
+                motor_speed = 1.0
+            else:
+                motor_speed = 0.7
+
+            motor.forward(speed=motor_speed)
+
             # Log to database every 10 seconds
             if current_time - last_db_log_time >= 10:
-                sensor_entry = SensorData(ph=ph, tds=tds, tds_voltage=tds_volt)
+                sensor_entry = SensorData(ph=ph, tds=tds, tds_voltage=tds_volt, motor_speed=motor_speed)
                 db.session.add(sensor_entry)
                 db.session.commit()
                 last_db_log_time = current_time

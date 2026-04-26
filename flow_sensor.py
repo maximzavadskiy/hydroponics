@@ -9,7 +9,7 @@ flow_sensor = DigitalInputDevice(26, pull_up=False)
 
 pulse_count = 0
 total_pulses = 0
-flow_history = []
+flow_history = []  # Last 5 flow rate readings
 start_time = time.time()
 
 def count_pulse():
@@ -29,9 +29,9 @@ def get_flowrate():
     flow_rate = current_count / 7.5  # L/min
     total_liters = ((total_pulses / 450) * 2) * CALIBRATION
 
-    # Track flow for averaging (keep last 60 readings = ~1 minute)
+    # Track flow for averaging (keep last 5 readings)
     flow_history.append(flow_rate)
-    if len(flow_history) > 60:
+    if len(flow_history) > 5:
         flow_history.pop(0)
 
     avg_flow = sum(flow_history) / len(flow_history) if flow_history else 0

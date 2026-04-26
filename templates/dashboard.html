@@ -50,6 +50,11 @@
                 <div class="current-value" id="tds-value">--</div>
                 <div class="plot-container" id="tds-plot"></div>
             </div>
+            <div class="card">
+                <h2>Motor Speed</h2>
+                <div class="current-value" id="motor-value">--</div>
+                <p style="color: #666; font-size: 14px; margin-top: 20px;">1.0 = Full Power | 0.25 = Reduced Power</p>
+            </div>
         </div>
 
         <div class="card">
@@ -74,6 +79,7 @@
                 const latest = data[data.length - 1];
                 document.getElementById('ph-value').textContent = latest.ph.toFixed(2);
                 document.getElementById('tds-value').textContent = Math.round(latest.tds);
+                document.getElementById('motor-value').textContent = latest.motor_speed.toFixed(2);
             }
         }
 

@@ -38,12 +38,6 @@ light_on = False
 LIGHT_ON_HOUR = 9
 LIGHT_OFF_HOUR = 1  # 1am next day
 
-# Test mode: set to True to use minute-based schedule instead of hour-based
-# Example: LIGHT_ON_MINUTE = (13, 11) and LIGHT_OFF_MINUTE = (13, 12)
-TEST_MODE = True
-LIGHT_ON_MINUTE = (13, 33)   # Lights turn on at this time (hour, minute)
-LIGHT_OFF_MINUTE = (13, 34)  # Lights turn off at this time (hour, minute)
-
 def read_ph():
     voltage = phADC.value * VREF
     ph = (3.66 - voltage) / 0.168
@@ -77,39 +71,16 @@ def take_snapshot():
     return filepath
 
 def manage_light_schedule(current_time, light_driver):
-    """Control lights based on schedule (9am to 1am = 16 hours)
-
-    In TEST_MODE, uses minute-based schedule:
-    - LIGHT_ON_MINUTE: (hour, minute) when to turn on
-    - LIGHT_OFF_MINUTE: (hour, minute) when to turn off
-    """
+    """Control lights based on schedule (9am to 1am = 16 hours)"""
     current_dt = current_time if current_time else datetime.now()
+    current_hour = current_dt.hour
 
-    if TEST_MODE and LIGHT_ON_MINUTE and LIGHT_OFF_MINUTE:
-        # Test mode: minute-based schedule
-        current_time_tuple = (current_dt.hour, current_dt.minute)
-        # print("lights on off")
-        # light_driver.on()
-        # time.sleep(1)
-        # light_driver.off()
-        # time.sleep(1)
-        if LIGHT_ON_MINUTE <= current_time_tuple < LIGHT_OFF_MINUTE:
-            print("lights ON [test mode]")
-            light_driver.on()
-            return True
-        else:
-            print("lights OFF [test mode]")
-            light_driver.off()
-            return False
+    if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
+        light_driver.on()
+        return True
     else:
-        # Normal mode: hour-based schedule (9am to 1am)
-        current_hour = current_dt.hour
-        if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
-            light_driver.on()
-            return True
-        else:
-            light_driver.off()
-            return False
+        light_driver.off()
+        return False
 
 print("--- pH & TDS Live Readings ---")
 try:

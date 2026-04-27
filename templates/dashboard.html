@@ -30,6 +30,10 @@
         .status-dot.alive { background: #00FF00; box-shadow: 0 0 10px #00FF00; }
         .status-dot.dead { background: #FF0000; }
         .status-info { font-size: 14px; color: #666; margin-top: 10px; }
+        .snapshot-loading { display: none; text-align: center; padding: 40px; color: #999; }
+        .snapshot-loading.active { display: block; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -82,7 +86,8 @@
             </div>
             <div class="snapshot-info" id="snapshot-info" style="font-size: 14px; font-weight: bold; margin-bottom: 10px;"></div>
             <div class="snapshot-date" id="snapshot-date" style="color: #666; font-size: 13px; margin-bottom: 10px;"></div>
-            <img id="snapshot-display" src="" alt="No snapshots yet" style="width: 100%; border-radius: 4px;">
+            <div class="snapshot-loading" id="snapshot-loading"><div class="spinner"></div>Loading snapshot...</div>
+            <img id="snapshot-display" src="" alt="No snapshots yet" style="width: 100%; border-radius: 4px; display: none;">
         </div>
     </div>
 
@@ -158,14 +163,21 @@
             snapshots = await response.json();
 
             const slider = document.getElementById('snapshot-slider');
+            const oldMax = slider.max;
             slider.max = Math.max(0, snapshots.length - 1);
 
             // If live mode, always show newest
             if (isLive) {
                 slider.value = slider.max;
-            } else if (parseInt(slider.value) > slider.max) {
-                // If current value is beyond the new max, adjust it
-                slider.value = slider.max;
+            } else {
+                // Don't change slider position, only adjust if it's now out of bounds
+                if (parseInt(slider.value) > slider.max) {
+                    slider.value = slider.max;
+                }
+                // If this is the first load, show the newest
+                if (oldMax === '0' && snapshots.length > 0) {
+                    slider.value = slider.max;
+                }
             }
 
             document.getElementById('snapshot-count').textContent = `${snapshots.length} snapshots`;
@@ -179,7 +191,8 @@
             const sliderIndex = parseInt(slider.value);
 
             if (snapshots.length === 0) {
-                document.getElementById('snapshot-display').src = '';
+                document.getElementById('snapshot-display').style.display = 'none';
+                document.getElementById('snapshot-loading').classList.remove('active');
                 document.getElementById('snapshot-info').textContent = 'No snapshots yet';
                 document.getElementById('snapshot-date').textContent = '';
                 return;
@@ -191,19 +204,32 @@
             const snapshotNumber = sliderIndex + 1;
             const snapshot = snapshots[snapshotIndex];
 
+            // Show loading animation
+            document.getElementById('snapshot-loading').classList.add('active');
+            document.getElementById('snapshot-display').style.display = 'none';
+
             // Update display info immediately
             document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
             document.getElementById('snapshot-date').textContent = new Date(snapshot.timestamp).toLocaleString();
 
-            // Load the image
+            // Load the image (try compressed first, fallback to original)
             const img = new Image();
             img.onload = function() {
                 document.getElementById('snapshot-display').src = img.src;
+                document.getElementById('snapshot-display').style.display = 'block';
+                document.getElementById('snapshot-loading').classList.remove('active');
             };
             img.onerror = function() {
                 document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length} - Failed to load`;
+                document.getElementById('snapshot-loading').classList.remove('active');
             };
-            img.src = `/snapshots/${snapshot.filename}`;
+            // Try compressed image first (webp), fallback to original jpg
+            img.src = `/snapshots/${snapshot.filename.replace('.jpg', '.webp')}`;
+            const fallbackImg = new Image();
+            fallbackImg.onerror = function() {
+                img.src = `/snapshots/${snapshot.filename}`;
+            };
+            fallbackImg.src = img.src;
         }
 
         // Event listeners

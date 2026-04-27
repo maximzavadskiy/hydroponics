@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from server import app, db, SensorData, Snapshot
 from flow_sensor import get_flowrate
+from PIL import Image
 
 # Define motors (Forward Pin, Backward Pin)
 # Motor 1: Controlled speed (0.25-1.0)
@@ -52,12 +53,34 @@ def read_tds():
     tds_value = (133.42 * compensation_voltage**3 - 255.86 * compensation_voltage**2 + 857.39 * compensation_voltage) * 0.5
     return tds_value, voltage
 
+def compress_image(filepath):
+    """Compress snapshot to webp format"""
+    try:
+        img = Image.open(filepath)
+        webp_path = filepath.with_suffix('.webp')
+        img.save(webp_path, 'WEBP', quality=85)
+        return webp_path
+    except Exception as e:
+        print(f"Error compressing image: {e}")
+        return filepath
+
 def take_snapshot():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = snapshot_dir / f"snapshot_{timestamp}.jpg"
     subprocess.run(["rpicam-still", "-o", str(filepath), "-t", "1000"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    compress_image(filepath)
     return filepath
+
+def manage_light_schedule(current_time, light_driver):
+    """Control lights based on schedule (9am to 1am = 16 hours)"""
+    current_hour = datetime.now().hour
+    if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
+        light_driver.on()
+        return True
+    else:
+        light_driver.off()
+        return False
 
 print("--- pH & TDS Live Readings ---")
 try:
@@ -80,14 +103,7 @@ try:
             motor1.forward(speed=motor_speed)
             motor2.forward(speed=1.0)
 
-            # Light schedule: 9am to 1am (16 hours)
-            current_hour = datetime.now().hour
-            if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
-                light_driver.on()
-                light_on = True
-            else:
-                light_driver.off()
-                light_on = False
+            light_on = manage_light_schedule(current_time, light_driver)
 
             # Log to database every 10 seconds
             if current_time - last_db_log_time >= 10:

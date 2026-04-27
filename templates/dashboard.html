@@ -96,6 +96,9 @@
         let currentHours = 24;
         let isLive = false;
         let liveInterval = null;
+        let lastUpdateTime = null;
+        let sliderTimeout = null;
+        let isSliderDragging = false;
 
         async function loadSensorData() {
             const response = await fetch('/api/sensor-data?hours=1');
@@ -131,15 +134,20 @@
             }
 
             document.getElementById('app-uptime').textContent = `Uptime: ${status.uptime}`;
+            lastUpdateTime = Date.now() - status.time_since_update * 1000;
+            updateLastUpdateDisplay();
+        }
 
-            // Format time since update
+        function updateLastUpdateDisplay() {
+            if (!lastUpdateTime) return;
+            const secondsAgo = Math.floor((Date.now() - lastUpdateTime) / 1000);
             let timeStr;
-            if (status.time_since_update < 60) {
-                timeStr = `${status.time_since_update}sec ago`;
-            } else if (status.time_since_update < 3600) {
-                timeStr = `${Math.floor(status.time_since_update / 60)}min ago`;
+            if (secondsAgo < 60) {
+                timeStr = `${secondsAgo}sec ago`;
+            } else if (secondsAgo < 3600) {
+                timeStr = `${Math.floor(secondsAgo / 60)}min ago`;
             } else {
-                timeStr = `${Math.floor(status.time_since_update / 3600)}h ago`;
+                timeStr = `${Math.floor(secondsAgo / 3600)}h ago`;
             }
             document.getElementById('app-last-update').textContent = `Last update: ${timeStr}`;
         }
@@ -203,14 +211,13 @@
             const snapshotIndex = snapshots.length - 1 - sliderIndex;
             const snapshotNumber = sliderIndex + 1;
             const snapshot = snapshots[snapshotIndex];
+            const snapshotTime = new Date(snapshot.timestamp).toLocaleString();
 
-            // Show loading animation
+            // Show loading animation with snapshot info
             document.getElementById('snapshot-loading').classList.add('active');
             document.getElementById('snapshot-display').style.display = 'none';
-
-            // Update display info immediately
-            document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
-            document.getElementById('snapshot-date').textContent = new Date(snapshot.timestamp).toLocaleString();
+            document.getElementById('snapshot-info').textContent = `Loading snapshot ${snapshotNumber}/${snapshots.length}...`;
+            document.getElementById('snapshot-date').textContent = snapshotTime;
 
             // Load the image (try compressed first, fallback to original)
             const img = new Image();
@@ -218,6 +225,7 @@
                 document.getElementById('snapshot-display').src = img.src;
                 document.getElementById('snapshot-display').style.display = 'block';
                 document.getElementById('snapshot-loading').classList.remove('active');
+                document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
             };
             img.onerror = function() {
                 document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length} - Failed to load`;
@@ -242,14 +250,44 @@
             });
         });
 
-        document.getElementById('snapshot-slider').addEventListener('input', () => {
+        document.getElementById('snapshot-slider').addEventListener('mousedown', () => {
+            isSliderDragging = true;
+            if (sliderTimeout) {
+                clearTimeout(sliderTimeout);
+                sliderTimeout = null;
+            }
+        });
+
+        document.getElementById('snapshot-slider').addEventListener('mouseup', () => {
+            isSliderDragging = false;
             isLive = false;
             document.getElementById('live-checkbox').checked = false;
             if (liveInterval) {
                 clearInterval(liveInterval);
                 liveInterval = null;
             }
-            updateSnapshotDisplay();
+            // Wait 0.5 seconds after release before loading
+            if (sliderTimeout) clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => {
+                updateSnapshotDisplay();
+                sliderTimeout = null;
+            }, 500);
+        });
+
+        document.getElementById('snapshot-slider').addEventListener('input', () => {
+            if (!isSliderDragging) {
+                isLive = false;
+                document.getElementById('live-checkbox').checked = false;
+                if (liveInterval) {
+                    clearInterval(liveInterval);
+                    liveInterval = null;
+                }
+                if (sliderTimeout) clearTimeout(sliderTimeout);
+                sliderTimeout = setTimeout(() => {
+                    updateSnapshotDisplay();
+                    sliderTimeout = null;
+                }, 500);
+            }
         });
 
         document.getElementById('live-checkbox').addEventListener('change', (e) => {
@@ -281,6 +319,7 @@
         // Refresh intervals
         setInterval(loadSensorData, 10000);  // Update sensor values every 10s
         setInterval(loadAppStatus, 2000);    // Check app status every 2s
+        setInterval(updateLastUpdateDisplay, 1000);  // Update "time ago" every second
         setInterval(() => {
             loadPlots(currentHours);
             loadSnapshots();

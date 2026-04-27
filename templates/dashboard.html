@@ -79,14 +79,16 @@
                 <input type="range" class="snapshot-slider" id="snapshot-slider" min="0" max="0">
                 <span id="snapshot-count">0 snapshots</span>
             </div>
-            <img id="snapshot-display" src="" alt="No snapshots yet">
+            <img id="snapshot-display" src="" alt="No snapshots yet" style="opacity: 1; transition: opacity 0.3s;">
             <div class="snapshot-info" id="snapshot-info"></div>
+            <div class="snapshot-date" id="snapshot-date" style="color: #999; font-size: 12px; margin-top: 5px;"></div>
         </div>
     </div>
 
     <script>
         let snapshots = [];
         let currentHours = 24;
+        let loadingSnapshot = false;
 
         async function loadSensorData() {
             const response = await fetch('/api/sensor-data?hours=1');
@@ -161,19 +163,40 @@
             updateSnapshotDisplay();
         }
 
-        function updateSnapshotDisplay() {
+        async function updateSnapshotDisplay() {
             const slider = document.getElementById('snapshot-slider');
-            const index = parseInt(slider.value);
+            const sliderIndex = parseInt(slider.value);
 
             if (snapshots.length === 0) {
                 document.getElementById('snapshot-display').src = '';
                 document.getElementById('snapshot-info').textContent = 'No snapshots yet';
+                document.getElementById('snapshot-date').textContent = '';
                 return;
             }
 
-            const snapshot = snapshots[index];
-            document.getElementById('snapshot-display').src = `/snapshots/${snapshot.filename}`;
-            document.getElementById('snapshot-info').textContent = `${index + 1}/${snapshots.length} • ${new Date(snapshot.timestamp).toLocaleString()}`;
+            // Reverse numbering: newest snapshot = highest number
+            const snapshotNumber = snapshots.length - sliderIndex;
+            const snapshot = snapshots[sliderIndex];
+
+            // Show loading state while fetching
+            if (!loadingSnapshot) {
+                loadingSnapshot = true;
+                document.getElementById('snapshot-info').textContent = `Loading snapshot ${snapshotNumber}/${snapshots.length}...`;
+                document.getElementById('snapshot-date').textContent = '';
+
+                const img = new Image();
+                img.onload = function() {
+                    document.getElementById('snapshot-display').src = img.src;
+                    document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
+                    document.getElementById('snapshot-date').textContent = new Date(snapshot.timestamp).toLocaleString();
+                    loadingSnapshot = false;
+                };
+                img.onerror = function() {
+                    document.getElementById('snapshot-info').textContent = `Failed to load snapshot ${snapshotNumber}/${snapshots.length}`;
+                    loadingSnapshot = false;
+                };
+                img.src = `/snapshots/${snapshot.filename}`;
+            }
         }
 
         // Event listeners
@@ -186,7 +209,7 @@
             });
         });
 
-        document.getElementById('snapshot-slider').addEventListener('input', updateSnapshotDisplay);
+        document.getElementById('snapshot-slider').addEventListener('input', () => updateSnapshotDisplay());
 
         // Initial load
         loadPlots(currentHours);

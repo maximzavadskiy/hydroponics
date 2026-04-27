@@ -4,6 +4,8 @@ import psutil
 import time
 import requests
 from pathlib import Path
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 log_file = Path(__file__).parent / "watchdog.log"
 
@@ -27,12 +29,9 @@ def restart_service(service_name):
         log_message(f"Error restarting {service_name}: {e}")
 
 def restart_localtunnel():
-    """Restart localtunnel process"""
+    """Restart localtunnel systemd service"""
     try:
-        subprocess.run(['pkill', '-f', 'localtunnel'], check=False)
-        time.sleep(1)
-        subprocess.Popen(['npx', 'localtunnel', '--port', '5000', '--subdomain', 'hydroponics-max'],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(['sudo', 'systemctl', 'restart', 'localtunnel.service'], check=True)
         log_message("localtunnel restarted successfully")
     except Exception as e:
         log_message(f"Error restarting localtunnel: {e}")
@@ -41,6 +40,14 @@ def check_server_health():
     """Check if server is responding"""
     try:
         response = requests.get('http://localhost:5000/api/app-status', timeout=2)
+        return response.status_code == 200
+    except:
+        return False
+
+def check_tunnel_health():
+    """Check if tunnel is responding to public requests"""
+    try:
+        response = requests.get('https://hydroponics-max.loca.lt/api/app-status', timeout=5, verify=False)
         return response.status_code == 200
     except:
         return False
@@ -62,9 +69,11 @@ if __name__ == '__main__':
         log_message("Server not responding - restarting via systemd")
         restart_service("hydroponics-server.service")
 
-    # Check localtunnel
-    if not is_running("localtunnel"):
-        log_message("localtunnel not running - restarting")
+    # Check localtunnel - test actual tunnel health, not just process
+    tunnel_ok = is_running("localtunnel") and check_tunnel_health()
+    if not tunnel_ok:
+        log_message("localtunnel not responding - restarting")
         restart_localtunnel()
+        time.sleep(3)  # Give tunnel time to establish connection
     else:
         log_message("All services healthy")

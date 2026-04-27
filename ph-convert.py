@@ -1,4 +1,4 @@
-from gpiozero import MCP3008, OutputDevice
+from gpiozero import MCP3008, OutputDevice, Motor
 from gpiozero.mixins import GPIOQueue
 import statistics
 import time
@@ -8,9 +8,7 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from server import app, db, SensorData, Snapshot
-from flow_sensor import get_flowrate, flow_sensor
-from gpiozero import Motor
-from signal import pause
+from flow_sensor import get_flowrate
 
 # Define motors (Forward Pin, Backward Pin)
 # Motor 1: Controlled speed (0.25-1.0)

@@ -14,10 +14,8 @@ from PIL import Image
 # Define motors (Forward Pin, Backward Pin)
 # Motor 1: Controlled speed (0.25-1.0)
 motor1 = Motor(forward=17, backward=27)
-# Motor 2: Full speed (GPIO 22-23)
-motor2 = Motor(forward=22, backward=23)
 # Light driver (GPIO 24)
-light_driver = OutputDevice(24)
+light_driver = OutputDevice(23)
 
 phADC = MCP3008(channel=0 )
 tdsADC = MCP3008(channel=1)
@@ -43,8 +41,8 @@ LIGHT_OFF_HOUR = 1  # 1am next day
 # Test mode: set to True to use minute-based schedule instead of hour-based
 # Example: LIGHT_ON_MINUTE = (13, 11) and LIGHT_OFF_MINUTE = (13, 12)
 TEST_MODE = True
-LIGHT_ON_MINUTE = (13, 11)   # Lights turn on at this time (hour, minute)
-LIGHT_OFF_MINUTE = (13, 12)  # Lights turn off at this time (hour, minute)
+LIGHT_ON_MINUTE = (13, 33)   # Lights turn on at this time (hour, minute)
+LIGHT_OFF_MINUTE = (13, 34)  # Lights turn off at this time (hour, minute)
 
 def read_ph():
     voltage = phADC.value * VREF
@@ -90,10 +88,17 @@ def manage_light_schedule(current_time, light_driver):
     if TEST_MODE and LIGHT_ON_MINUTE and LIGHT_OFF_MINUTE:
         # Test mode: minute-based schedule
         current_time_tuple = (current_dt.hour, current_dt.minute)
+        # print("lights on off")
+        # light_driver.on()
+        # time.sleep(1)
+        # light_driver.off()
+        # time.sleep(1)
         if LIGHT_ON_MINUTE <= current_time_tuple < LIGHT_OFF_MINUTE:
+            print("lights ON [test mode]")
             light_driver.on()
             return True
         else:
+            print("lights OFF [test mode]")
             light_driver.off()
             return False
     else:
@@ -125,7 +130,6 @@ try:
                 motor_speed = 0.7
 
             motor1.forward(speed=motor_speed)
-            motor2.forward(speed=1.0)
 
             light_on = manage_light_schedule(None, light_driver)
 

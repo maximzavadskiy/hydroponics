@@ -1,8 +1,36 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.pytest_cache/
+.coverage
+
+# IDE
 .DS_Store
-instance/hydroponics.db
-snapshots/
+.vscode/
+.idea/
+
+# Database and logs
+instance/
+*.db
+*.log
+localtunnel.log
 watchdog.log
+
+# Snapshots and media
+snapshots/
+*.jpg
+*.jpeg
+*.png
+*.webp
+
+# Environment
+.env
+.env.local
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db

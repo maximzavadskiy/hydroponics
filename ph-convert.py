@@ -40,6 +40,12 @@ light_on = False
 LIGHT_ON_HOUR = 9
 LIGHT_OFF_HOUR = 1  # 1am next day
 
+# Test mode: set to True to use minute-based schedule instead of hour-based
+# Example: LIGHT_ON_MINUTE = (13, 11) and LIGHT_OFF_MINUTE = (13, 12)
+TEST_MODE = True
+LIGHT_ON_MINUTE = (13, 11)   # Lights turn on at this time (hour, minute)
+LIGHT_OFF_MINUTE = (13, 12)  # Lights turn off at this time (hour, minute)
+
 def read_ph():
     voltage = phADC.value * VREF
     ph = (3.66 - voltage) / 0.168
@@ -73,14 +79,32 @@ def take_snapshot():
     return filepath
 
 def manage_light_schedule(current_time, light_driver):
-    """Control lights based on schedule (9am to 1am = 16 hours)"""
-    current_hour = datetime.now().hour
-    if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
-        light_driver.on()
-        return True
+    """Control lights based on schedule (9am to 1am = 16 hours)
+
+    In TEST_MODE, uses minute-based schedule:
+    - LIGHT_ON_MINUTE: (hour, minute) when to turn on
+    - LIGHT_OFF_MINUTE: (hour, minute) when to turn off
+    """
+    current_dt = current_time if current_time else datetime.now()
+
+    if TEST_MODE and LIGHT_ON_MINUTE and LIGHT_OFF_MINUTE:
+        # Test mode: minute-based schedule
+        current_time_tuple = (current_dt.hour, current_dt.minute)
+        if LIGHT_ON_MINUTE <= current_time_tuple < LIGHT_OFF_MINUTE:
+            light_driver.on()
+            return True
+        else:
+            light_driver.off()
+            return False
     else:
-        light_driver.off()
-        return False
+        # Normal mode: hour-based schedule (9am to 1am)
+        current_hour = current_dt.hour
+        if LIGHT_ON_HOUR <= current_hour < 24 or current_hour < LIGHT_OFF_HOUR:
+            light_driver.on()
+            return True
+        else:
+            light_driver.off()
+            return False
 
 print("--- pH & TDS Live Readings ---")
 try:
@@ -103,7 +127,7 @@ try:
             motor1.forward(speed=motor_speed)
             motor2.forward(speed=1.0)
 
-            light_on = manage_light_schedule(current_time, light_driver)
+            light_on = manage_light_schedule(None, light_driver)
 
             # Log to database every 10 seconds
             if current_time - last_db_log_time >= 10:

@@ -78,17 +78,19 @@
             <div class="controls">
                 <input type="range" class="snapshot-slider" id="snapshot-slider" min="0" max="0">
                 <span id="snapshot-count">0 snapshots</span>
+                <label style="margin-left: 20px;"><input type="checkbox" id="live-checkbox"> Live</label>
             </div>
-            <img id="snapshot-display" src="" alt="No snapshots yet" style="opacity: 1; transition: opacity 0.3s;">
-            <div class="snapshot-info" id="snapshot-info"></div>
-            <div class="snapshot-date" id="snapshot-date" style="color: #999; font-size: 12px; margin-top: 5px;"></div>
+            <div class="snapshot-info" id="snapshot-info" style="font-size: 14px; font-weight: bold; margin-bottom: 10px;"></div>
+            <div class="snapshot-date" id="snapshot-date" style="color: #666; font-size: 13px; margin-bottom: 10px;"></div>
+            <img id="snapshot-display" src="" alt="No snapshots yet" style="width: 100%; border-radius: 4px;">
         </div>
     </div>
 
     <script>
         let snapshots = [];
         let currentHours = 24;
-        let loadingSnapshot = false;
+        let isLive = false;
+        let liveInterval = null;
 
         async function loadSensorData() {
             const response = await fetch('/api/sensor-data?hours=1');
@@ -157,10 +159,19 @@
 
             const slider = document.getElementById('snapshot-slider');
             slider.max = Math.max(0, snapshots.length - 1);
-            slider.value = snapshots.length - 1;
+
+            // If live mode, always show newest
+            if (isLive) {
+                slider.value = slider.max;
+            } else if (parseInt(slider.value) > slider.max) {
+                // If current value is beyond the new max, adjust it
+                slider.value = slider.max;
+            }
 
             document.getElementById('snapshot-count').textContent = `${snapshots.length} snapshots`;
-            updateSnapshotDisplay();
+            if (snapshots.length > 0) {
+                updateSnapshotDisplay();
+            }
         }
 
         async function updateSnapshotDisplay() {
@@ -174,29 +185,25 @@
                 return;
             }
 
-            // Reverse numbering: newest snapshot = highest number
-            const snapshotNumber = snapshots.length - sliderIndex;
-            const snapshot = snapshots[sliderIndex];
+            // Most recent snapshot is at index 0, oldest at the end
+            // Slider right (max) = newest, Slider left (min) = oldest
+            const snapshotIndex = snapshots.length - 1 - sliderIndex;
+            const snapshotNumber = sliderIndex + 1;
+            const snapshot = snapshots[snapshotIndex];
 
-            // Show loading state while fetching
-            if (!loadingSnapshot) {
-                loadingSnapshot = true;
-                document.getElementById('snapshot-info').textContent = `Loading snapshot ${snapshotNumber}/${snapshots.length}...`;
-                document.getElementById('snapshot-date').textContent = '';
+            // Update display info immediately
+            document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
+            document.getElementById('snapshot-date').textContent = new Date(snapshot.timestamp).toLocaleString();
 
-                const img = new Image();
-                img.onload = function() {
-                    document.getElementById('snapshot-display').src = img.src;
-                    document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length}`;
-                    document.getElementById('snapshot-date').textContent = new Date(snapshot.timestamp).toLocaleString();
-                    loadingSnapshot = false;
-                };
-                img.onerror = function() {
-                    document.getElementById('snapshot-info').textContent = `Failed to load snapshot ${snapshotNumber}/${snapshots.length}`;
-                    loadingSnapshot = false;
-                };
-                img.src = `/snapshots/${snapshot.filename}`;
-            }
+            // Load the image
+            const img = new Image();
+            img.onload = function() {
+                document.getElementById('snapshot-display').src = img.src;
+            };
+            img.onerror = function() {
+                document.getElementById('snapshot-info').textContent = `Snapshot ${snapshotNumber}/${snapshots.length} - Failed to load`;
+            };
+            img.src = `/snapshots/${snapshot.filename}`;
         }
 
         // Event listeners
@@ -209,7 +216,36 @@
             });
         });
 
-        document.getElementById('snapshot-slider').addEventListener('input', () => updateSnapshotDisplay());
+        document.getElementById('snapshot-slider').addEventListener('input', () => {
+            isLive = false;
+            document.getElementById('live-checkbox').checked = false;
+            if (liveInterval) {
+                clearInterval(liveInterval);
+                liveInterval = null;
+            }
+            updateSnapshotDisplay();
+        });
+
+        document.getElementById('live-checkbox').addEventListener('change', (e) => {
+            isLive = e.target.checked;
+            if (isLive) {
+                // Load latest snapshot immediately
+                const slider = document.getElementById('snapshot-slider');
+                slider.value = slider.max;
+                updateSnapshotDisplay();
+                // Reload latest snapshot every 5 seconds
+                liveInterval = setInterval(() => {
+                    const slider = document.getElementById('snapshot-slider');
+                    slider.value = slider.max;
+                    updateSnapshotDisplay();
+                }, 5000);
+            } else {
+                if (liveInterval) {
+                    clearInterval(liveInterval);
+                    liveInterval = null;
+                }
+            }
+        });
 
         // Initial load
         loadPlots(currentHours);
@@ -222,7 +258,7 @@
         setInterval(() => {
             loadPlots(currentHours);
             loadSnapshots();
-        }, 30000);
+        }, 10000);  // Reload snapshots every 10s for better live view
     </script>
 </body>
 </html>
